@@ -31,6 +31,16 @@
         color: #4b5563;
       }
 
+      .manual-hint {
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        color: #3730a3;
+        padding: 12px 14px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        font-size: 14px;
+      }
+
       .booking-bar {
         display: flex;
         gap: 8px;
@@ -90,18 +100,45 @@
         font-weight: 600;
       }
 
+      .status-pill {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .status-pill.free {
+        background: #dcfce7;
+        color: #166534;
+      }
+
+      .status-pill.taken {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+
       .status {
         margin-top: 10px;
         min-height: 20px;
         font-size: 14px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px 12px;
       }
 
       .status.error {
-        color: #b91c1c;
+        color: #991b1b;
+        background: #fef2f2;
+        border-color: #fecaca;
       }
 
       .status.success {
-        color: #166534;
+        color: #14532d;
+        background: #f0fdf4;
+        border-color: #bbf7d0;
       }
 
       .table-wrap {
@@ -135,6 +172,10 @@
         Выберите подарок из списка и нажмите «Забронировать». Если подарок уже занят, рядом будет
         указан человек, который его забронировал.
       </p>
+      <div class="manual-hint">
+        💡 Для быстрой проверки: введите имя, нажмите «Забронировать», затем обновите страницу —
+        бронь должна остаться. Ссылки «Открыть» запускаются в новой вкладке.
+      </div>
 
       <div class="booking-bar">
         <input
@@ -153,6 +194,7 @@
               <th>Название подарка</th>
               <th>Цена</th>
               <th>Ссылка на маркетплейс</th>
+              <th>Статус</th>
               <th>Кто забронировал</th>
               <th>Действие</th>
             </tr>
@@ -188,12 +230,15 @@
           const row = document.createElement('tr');
           const reservedBy = gift.reserved_by || '—';
           const isTaken = Boolean(gift.reserved_by);
+          const statusLabel = isTaken ? 'Забронировано' : 'Свободно';
+          const statusClass = isTaken ? 'taken' : 'free';
 
           row.innerHTML = `
             <td>${index + 1}</td>
             <td>${gift.name}</td>
             <td>${gift.price}</td>
             <td><a href="${gift.link}" target="_blank" rel="noopener noreferrer">Открыть</a></td>
+            <td><span class="status-pill ${statusClass}">${statusLabel}</span></td>
             <td>${reservedBy}</td>
             <td>
               ${
