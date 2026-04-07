@@ -41,18 +41,32 @@
         font-size: 14px;
       }
 
-      .booking-bar {
+      .reserve-form {
         display: flex;
         gap: 8px;
-        margin-bottom: 16px;
+        align-items: center;
+        flex-wrap: wrap;
       }
 
-      input[type='text'] {
-        flex: 1;
+      .reserve-form input[type='text'] {
+        min-width: 220px;
+        width: min(100%, 280px);
         padding: 10px 12px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
+      }
+
+      .reserve-form button {
+        padding: 8px 10px;
+      }
+
+      .reserve-form .cancel-btn {
+        background: #6b7280;
+      }
+
+      .reserve-form .confirm-btn {
+        background: #1d4ed8;
       }
 
       table {
@@ -141,6 +155,12 @@
         border-color: #bbf7d0;
       }
 
+      .inline-error {
+        margin-top: 6px;
+        color: #991b1b;
+        font-size: 12px;
+      }
+
       .table-wrap {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -173,17 +193,8 @@
         указан человек, который его забронировал.
       </p>
       <div class="manual-hint">
-        💡 Для быстрой проверки: введите имя, нажмите «Забронировать», затем обновите страницу —
-        бронь должна остаться. Ссылки «Открыть» запускаются в новой вкладке.
-      </div>
-
-      <div class="booking-bar">
-        <input
-          id="personName"
-          type="text"
-          placeholder="Введите ваше имя (2–80 символов)"
-          maxlength="80"
-        />
+        💡 Нажмите «Забронировать» у нужного подарка, введите имя и подтвердите бронь. Данные
+        сохраняются даже после обновления страницы.
       </div>
 
       <div class="table-wrap">
@@ -208,8 +219,9 @@
 
     <script>
       const giftsBody = document.getElementById('giftsBody');
-      const personNameInput = document.getElementById('personName');
       const statusEl = document.getElementById('status');
+      const openedForms = new Map();
+      let activeGiftId = null;
 
       function setStatus(message, type = '') {
         statusEl.textContent = message;
@@ -244,28 +256,81 @@
               ${
                 isTaken
                   ? '<span class="taken">Занят</span>'
-                  : `<button data-id="${gift.id}">Забронировать</button>`
+                  : `<button data-action="open-form" data-id="${gift.id}">Забронировать</button>`
               }
             </td>
           `;
 
+          row.dataset.giftId = gift.id;
           giftsBody.appendChild(row);
         });
+
+        openedForms.clear();
+        activeGiftId = null;
       }
 
-      giftsBody.addEventListener('click', async (event) => {
-        if (event.target.tagName !== 'BUTTON') return;
+      function closeForm(giftId) {
+        const formRow = openedForms.get(giftId);
+        if (!formRow) return;
+        formRow.remove();
+        openedForms.delete(giftId);
+        if (activeGiftId === giftId) {
+          activeGiftId = null;
+        }
+      }
 
-        const name = personNameInput.value.trim();
-        const giftId = event.target.dataset.id;
+      function openForm(triggerButton) {
+        const giftId = Number(triggerButton.dataset.id);
+        if (!giftId || activeGiftId === giftId) return;
+
+        if (activeGiftId !== null) {
+          closeForm(activeGiftId);
+        }
+
+        const row = triggerButton.closest('tr');
+        if (!row) return;
+
+        const formRow = document.createElement('tr');
+        formRow.innerHTML = `
+          <td colspan="7">
+            <div class="reserve-form">
+              <input
+                type="text"
+                data-role="name"
+                maxlength="80"
+                placeholder="Введите ваше имя (2–80 символов)"
+              />
+              <button class="confirm-btn" data-action="confirm-booking" data-id="${giftId}">
+                Подтвердить
+              </button>
+              <button class="cancel-btn" data-action="cancel-form" data-id="${giftId}">
+                Отмена
+              </button>
+            </div>
+            <div class="inline-error" data-role="inline-error"></div>
+          </td>
+        `;
+
+        row.insertAdjacentElement('afterend', formRow);
+        openedForms.set(giftId, formRow);
+        activeGiftId = giftId;
+        formRow.querySelector('input[data-role="name"]').focus();
+      }
+
+      async function submitBooking(giftId, formRow) {
+        const nameInput = formRow.querySelector('input[data-role="name"]');
+        const errorEl = formRow.querySelector('[data-role="inline-error"]');
+        const name = (nameInput.value || '').trim();
+
+        errorEl.textContent = '';
 
         if (!name) {
-          setStatus('Сначала введите ваше имя.', 'error');
+          errorEl.textContent = 'Введите имя. Пустое значение или пробелы недопустимы.';
           return;
         }
 
         if (name.length < 2) {
-          setStatus('Имя слишком короткое. Минимум 2 символа.', 'error');
+          errorEl.textContent = 'Имя слишком короткое. Минимум 2 символа.';
           return;
         }
 
@@ -280,14 +345,47 @@
 
           if (!response.ok) {
             setStatus(data.message || 'Не удалось забронировать подарок.', 'error');
+            if (response.status === 409) {
+              closeForm(giftId);
+            }
             await loadGifts();
             return;
           }
 
           setStatus(data.message, 'success');
+          closeForm(giftId);
           await loadGifts();
         } catch (error) {
           setStatus('Ошибка сети. Попробуйте еще раз.', 'error');
+        }
+      }
+
+      giftsBody.addEventListener('click', async (event) => {
+        const target = event.target.closest('button');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const giftId = Number(target.dataset.id);
+
+        if (!action || !giftId) {
+          return;
+        }
+
+        if (action === 'open-form') {
+          openForm(target);
+          return;
+        }
+
+        const formRow = openedForms.get(giftId);
+        if (!formRow) return;
+
+        if (action === 'cancel-form') {
+          closeForm(giftId);
+          return;
+        }
+
+        if (action === 'confirm-booking') {
+          await submitBooking(giftId, formRow);
         }
       });
 
