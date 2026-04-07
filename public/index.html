@@ -103,30 +103,63 @@
       .status.success {
         color: #166534;
       }
+
+      .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          margin-top: 20px;
+        }
+
+        th,
+        td {
+          font-size: 13px;
+          padding: 8px;
+          white-space: nowrap;
+        }
+
+        button {
+          padding: 8px 10px;
+          font-size: 13px;
+        }
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>Wishlist подарков для Темы 🎉</h1>
-      <p class="subtitle">Выберите подарок и забронируйте его своим именем.</p>
+      <p class="subtitle">
+        Выберите подарок из списка и нажмите «Забронировать». Если подарок уже занят, рядом будет
+        указан человек, который его забронировал.
+      </p>
 
       <div class="booking-bar">
-        <input id="personName" type="text" placeholder="Введите ваше имя" />
+        <input
+          id="personName"
+          type="text"
+          placeholder="Введите ваше имя (2–80 символов)"
+          maxlength="80"
+        />
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>№</th>
-            <th>Название подарка</th>
-            <th>Цена</th>
-            <th>Ссылка на маркетплейс</th>
-            <th>Кто забронировал</th>
-            <th>Действие</th>
-          </tr>
-        </thead>
-        <tbody id="giftsBody"></tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Название подарка</th>
+              <th>Цена</th>
+              <th>Ссылка на маркетплейс</th>
+              <th>Кто забронировал</th>
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody id="giftsBody"></tbody>
+        </table>
+      </div>
 
       <p id="status" class="status"></p>
     </div>
@@ -143,6 +176,10 @@
 
       async function loadGifts() {
         const response = await fetch('/api/gifts');
+        if (!response.ok) {
+          throw new Error('load_failed');
+        }
+
         const gifts = await response.json();
 
         giftsBody.innerHTML = '';
@@ -182,6 +219,11 @@
           return;
         }
 
+        if (name.length < 2) {
+          setStatus('Имя слишком короткое. Минимум 2 символа.', 'error');
+          return;
+        }
+
         try {
           const response = await fetch(`/api/gifts/${giftId}/book`, {
             method: 'POST',
@@ -204,7 +246,9 @@
         }
       });
 
-      loadGifts();
+      loadGifts().catch(() => {
+        setStatus('Не удалось загрузить список подарков. Обновите страницу.', 'error');
+      });
     </script>
   </body>
 </html>
