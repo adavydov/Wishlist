@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wishlist подарков для Темы</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #f6f7fb;
+        color: #1f2a37;
+      }
+
+      .container {
+        max-width: 980px;
+        margin: 32px auto;
+        padding: 0 16px 32px;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        margin: 0 0 20px;
+        color: #4b5563;
+      }
+
+      .booking-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      input[type='text'] {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+        padding: 10px 12px;
+        font-size: 14px;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f3f4f6;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      button {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+      }
+
+      .taken {
+        color: #b91c1c;
+        font-weight: 600;
+      }
+
+      .status {
+        margin-top: 10px;
+        min-height: 20px;
+        font-size: 14px;
+      }
+
+      .status.error {
+        color: #b91c1c;
+      }
+
+      .status.success {
+        color: #166534;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Wishlist подарков для Темы 🎉</h1>
+      <p class="subtitle">Выберите подарок и забронируйте его своим именем.</p>
+
+      <div class="booking-bar">
+        <input id="personName" type="text" placeholder="Введите ваше имя" />
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>Название подарка</th>
+            <th>Цена</th>
+            <th>Ссылка на маркетплейс</th>
+            <th>Кто забронировал</th>
+            <th>Действие</th>
+          </tr>
+        </thead>
+        <tbody id="giftsBody"></tbody>
+      </table>
+
+      <p id="status" class="status"></p>
+    </div>
+
+    <script>
+      const giftsBody = document.getElementById('giftsBody');
+      const personNameInput = document.getElementById('personName');
+      const statusEl = document.getElementById('status');
+
+      function setStatus(message, type = '') {
+        statusEl.textContent = message;
+        statusEl.className = `status ${type}`;
+      }
+
+      async function loadGifts() {
+        const response = await fetch('/api/gifts');
+        const gifts = await response.json();
+
+        giftsBody.innerHTML = '';
+
+        gifts.forEach((gift, index) => {
+          const row = document.createElement('tr');
+          const reservedBy = gift.reserved_by || '—';
+          const isTaken = Boolean(gift.reserved_by);
+
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${gift.name}</td>
+            <td>${gift.price}</td>
+            <td><a href="${gift.link}" target="_blank" rel="noopener noreferrer">Открыть</a></td>
+            <td>${reservedBy}</td>
+            <td>
+              ${
+                isTaken
+                  ? '<span class="taken">Занят</span>'
+                  : `<button data-id="${gift.id}">Забронировать</button>`
+              }
+            </td>
+          `;
+
+          giftsBody.appendChild(row);
+        });
+      }
+
+      giftsBody.addEventListener('click', async (event) => {
+        if (event.target.tagName !== 'BUTTON') return;
+
+        const name = personNameInput.value.trim();
+        const giftId = event.target.dataset.id;
+
+        if (!name) {
+          setStatus('Сначала введите ваше имя.', 'error');
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/gifts/${giftId}/book`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            setStatus(data.message || 'Не удалось забронировать подарок.', 'error');
+            await loadGifts();
+            return;
+          }
+
+          setStatus(data.message, 'success');
+          await loadGifts();
+        } catch (error) {
+          setStatus('Ошибка сети. Попробуйте еще раз.', 'error');
+        }
+      });
+
+      loadGifts();
+    </script>
+  </body>
+</html>
